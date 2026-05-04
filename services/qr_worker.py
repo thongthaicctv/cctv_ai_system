@@ -205,12 +205,11 @@ class QRWorker:
         #    self.state.set_error(cam_id, "Scan EMP before order")
         #    return
 
-        self.state.start_record(
-            cam_id,
-            order_code=order_code,
-        )
+        st = self.state.get(cam_id)
 
-        order_ok()
+        # 🔥 Nếu đang ghi và trùng đơn → bỏ qua
+        if st.get("recording") and st.get("order_code") == order_code:
+            return
 
         self.state.start_record(
             cam_id,
