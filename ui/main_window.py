@@ -1,269 +1,55 @@
-# File: ui/main_window.py
-# CCTV_AI_SYSTEM PRO
-# Main Window Professional Version
+# FILE: ui/main_window.py
+# RESTORE UI PRO VERSION
+# giữ module mới + giao diện cũ
 
 import sys
-import json
-import os
-import socket
-from PySide6.QtCore import QTimer
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-import subprocess
-import platform
+from concurrent.futures import ThreadPoolExecutor
 
-import psutil
-import shutil
-
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QThread, QTimer, Signal
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QLabel,
-    QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QFrame, QStackedWidget
+    QApplication, QMainWindow, QWidget,
+    QHBoxLayout, QVBoxLayout, QPushButton,
+    QLabel, QFrame, QStackedWidget,
+    QCheckBox, QSystemTrayIcon, QStyle
 )
 
+from core.config_manager import load_config, save_config
+from core.logger import write_log
+from core.ping_service import ping_host
+
 from ui.camera_config import CameraConfigPage
+from ui.pages.camera_grid_page import CameraGridPage
+from core.runtime_state import RuntimeState
+from services.qr_engine import QREngine
+from services.record_engine import RecordEngine
+
+from ui.pages.dashboard_page import DashboardPage
+
+from ui.pages.storage_page import StoragePage
 
 
-CONFIG_FILE = "config.json"
+class NetworkCheckWorker(QThread):
+    results_ready = Signal(list)
 
-def load_config():
-    if not os.path.exists(CONFIG_FILE):
-        return {"cameras": []}
-
-    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-LOG_FILE = "logs/camera_events.log"
-
-def write_log(camera_name, status):
-    os.makedirs("logs", exist_ok=True)
-
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    line = f"{now} | {camera_name} | {status}\n"
-
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(line)
-
-
-def ping_host(ip):
-    try:
-        system = platform.system().lower()
-
-        if system == "windows":
-            cmd = ["ping", "-n", "1", "-w", "1000", ip]
-        else:
-            cmd = ["ping", "-c", "1", "-W", "1", ip]
-
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True
-        )
-
-        output = result.stdout.lower()
-
-        if f"reply from {ip}".lower() in output:
-            latency = 1
-
-            for line in output.splitlines():
-                if "time=" in line:
-                    try:
-                        part = line.split("time=")[1]
-                        latency = int(part.split("ms")[0].replace("<","").strip())
-                    except:
-                        pass
-
-            return True, latency
-
-        return False, 0
-
-    except:
-        return False, 0
-
-def check_camera(ip):
-    try:
-        socket.setdefaulttimeout(2)
-        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((ip, 554))
-        return True
-    except:
-        return False
-    
-
-# ===================================
-# CARD CAMERA STATUS
-# ===================================
-class CameraCard(QFrame):
-    def __init__(self, name, status="ONLINE"):
+    def __init__(self, cameras):
         super().__init__()
+        self.cameras = list(cameras)
 
-        self.setMinimumHeight(130)
-        self.setStyleSheet("""
-            QFrame{
-                background:#1c1c1c;
-                border:1px solid #2a2a2a;
-                border-radius:12px;
-            }
-        """)
+    def run(self):
+        def worker(cam):
+            online, latency = ping_host(cam["ip"])
+            return cam["id"], cam["name"], online, latency
 
-        self.lbl_name = QLabel(name)
-        self.lbl_name.setFont(QFont("Segoe UI", 11, QFont.Bold))
+        results = []
+        with ThreadPoolExecutor(max_workers=20) as ex:
+            for item in ex.map(worker, self.cameras):
+                results.append(item)
 
-        self.lbl_status = QLabel()
-        self.lbl_order = QLabel("Sẵn sàng")
-
-        self.set_status(status)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.lbl_name)
-        layout.addWidget(self.lbl_status)
-        layout.addWidget(self.lbl_order)
-        layout.addStretch()
-    
+        self.results_ready.emit(results)
 
 
-
-    def set_status(self, status):
-        if status == "ONLINE":
-            self.lbl_status.setText("🟢 ONLINE")
-        elif status == "OFFLINE":
-            self.lbl_status.setText("⚫ OFFLINE")
-        elif status == "CHECKING":
-            self.lbl_status.setText("🟡 CHECKING")
-        else:
-            self.lbl_status.setText("🟡 WAITING")
-
-    
-
-# ===================================
-# DASHBOARD PAGE
-# ===================================
-class DashboardPage(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.title = QLabel("TỔNG QUAN HỆ THỐNG")
-        self.title.setFont(QFont("Segoe UI", 18, QFont.Bold))
-
-        self.lbl_online = QLabel("Camera Online: 0")
-        self.lbl_offline = QLabel("Camera Offline: 0")
-        self.lbl_total = QLabel("Tổng camera: 0")
-        self.lbl_cpu = QLabel("CPU: 0%")
-        self.lbl_ram = QLabel("RAM: 0%")
-        self.lbl_disk = QLabel("Ổ D: 0%")
-
-        for lbl in [
-            self.lbl_online,
-            self.lbl_offline,
-            self.lbl_total,
-            self.lbl_cpu,
-            self.lbl_ram,
-            self.lbl_disk
-        ]:
-            lbl.setFont(QFont("Segoe UI", 12))
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.title)
-        layout.addSpacing(15)
-
-        layout.addWidget(self.lbl_online)
-        layout.addWidget(self.lbl_offline)
-        layout.addWidget(self.lbl_total)
-        layout.addWidget(self.lbl_cpu)
-        layout.addWidget(self.lbl_ram)
-        layout.addWidget(self.lbl_disk)
-
-        layout.addStretch()
-
-    def update_stats(self, runtime_status):
-        total = len(runtime_status)
-        online = sum(1 for v in runtime_status.values() if v)
-        offline = total - online
-
-        cpu = psutil.cpu_percent()
-        ram = psutil.virtual_memory().percent
-
-        disk = shutil.disk_usage("D:/")
-        used_percent = round((disk.used / disk.total) * 100)
-
-        self.lbl_online.setText(f"Camera Online: {online}")
-        self.lbl_offline.setText(f"Camera Offline: {offline}")
-        self.lbl_total.setText(f"Tổng camera: {total}")
-        self.lbl_cpu.setText(f"CPU: {cpu}%")
-        self.lbl_ram.setText(f"RAM: {ram}%")
-        self.lbl_disk.setText(f"Ổ D: {used_percent}%")
-
-# ===================================
-# CAMERA GRID PAGE
-# ===================================
-class CameraGridPage(QWidget):
-    def __init__(self):
-        super().__init__()
-
-        self.title = QLabel("TRẠNG THÁI CAMERA")
-        self.title.setFont(QFont("Segoe UI", 18, QFont.Bold))
-
-        self.grid = QGridLayout()
-        self.grid.setSpacing(10)
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(self.title)
-
-        
-        layout.addLayout(self.grid)
-
-        
-
-        self.reload_data()
-
-    def clear_grid(self):
-        while self.grid.count():
-            item = self.grid.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
-
-    def reload_data(self, runtime_status=None):
-        self.clear_grid()
-
-        data = load_config()
-        cams = data["cameras"]
-
-        if not cams:
-            card = CameraCard("CHƯA CÓ CAMERA", "OFFLINE")
-            card.lbl_order.setText("Vào cấu hình để thêm camera")
-            self.grid.addWidget(card, 0, 0)
-            return
-
-        for i, cam in enumerate(cams):
-
-            status = "CHECKING"
-            latency = 0
-            last_check = "-"
-            online = False
-
-            if runtime_status is not None:
-                info = runtime_status.get(cam["id"], {})
-
-                online = info.get("online", False)
-                status = info.get("status", "CHECKING")
-                latency = info.get("latency", 0)
-                last_check = info.get("last_check", "-")
-
-            card = CameraCard(cam["name"], status)
-            card.lbl_order.setText(
-                f"{cam['ip']} | {latency}ms | {last_check}"
-            )
-
-            row = i // 4
-            col = i % 4
-            self.grid.addWidget(card, row, col)
-
-# ===================================
-# MAIN WINDOW
-# ===================================
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -275,9 +61,11 @@ class MainWindow(QMainWindow):
             QMainWindow{
                 background:#111111;
             }
+
             QLabel{
                 color:#eeeeee;
             }
+
             QPushButton{
                 background:#1b1b1b;
                 color:#dddddd;
@@ -287,22 +75,47 @@ class MainWindow(QMainWindow):
                 text-align:left;
                 font-size:14px;
             }
+
             QPushButton:hover{
                 background:#2b2b2b;
             }
+
             QPushButton:checked{
                 background:#0f62fe;
                 color:white;
+            }
+
+            QCheckBox{
+                color:white;
+                padding:8px;
+                font-size:13px;
             }
         """)
 
         root = QWidget()
         self.setCentralWidget(root)
 
-        main_layout = QHBoxLayout(root)
-        main_layout.setContentsMargins(0,0,0,0)
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setIcon(
+            self.style().standardIcon(
+                QStyle.StandardPixmap.SP_ComputerIcon
+            )
+        )
+        self.tray.show()
 
-        # ================= Sidebar
+        main_layout = QHBoxLayout(root)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # ==================================================
+        # LOAD CONFIG
+        # ==================================================
+        data = load_config()
+        self.alert_enabled = data.get("alert_enabled", True)
+
+        # ==================================================
+        # SIDEBAR
+        # ==================================================
         sidebar = QFrame()
         sidebar.setFixedWidth(240)
         sidebar.setStyleSheet("""
@@ -312,133 +125,244 @@ class MainWindow(QMainWindow):
             }
         """)
 
-        side_layout = QVBoxLayout(sidebar)
+        side = QVBoxLayout(sidebar)
+        side.setContentsMargins(12, 12, 12, 12)
+        side.setSpacing(8)
 
         logo = QLabel("CCTV AI SYSTEM")
         logo.setFont(QFont("Segoe UI", 15, QFont.Bold))
 
-        side_layout.addWidget(logo)
-        side_layout.addSpacing(10)
+        side.addWidget(logo)
+        side.addSpacing(10)
 
         self.btn_camera = QPushButton("🎥 Camera")
         self.btn_dashboard = QPushButton("🏠 Tổng quan")
         self.btn_config = QPushButton("⚙️ Cấu hình Camera")
         self.btn_search = QPushButton("🔍 Tra cứu")
-        self.btn_video = QPushButton("📁 Video")
+        self.btn_video = QPushButton("💾Cài đặt lưu video")
+        self.btn_log = QPushButton("📜 Nhật ký")
 
-        buttons = [
+        self.buttons = [
             self.btn_camera,
             self.btn_dashboard,
             self.btn_config,
             self.btn_search,
-            self.btn_video
+            self.btn_video,
+            self.btn_log
         ]
 
-        for b in buttons:
+        for b in self.buttons:
             b.setCheckable(True)
-            side_layout.addWidget(b)
+            b.setMinimumHeight(46)
+            side.addWidget(b)
 
-        side_layout.addStretch()
+        self.chk_alert = QCheckBox("🔔 Bật cảnh báo")
+        self.chk_alert.setChecked(self.alert_enabled)
+        self.chk_alert.stateChanged.connect(self.toggle_alert)
 
-        # ================= Pages
+        side.addSpacing(8)
+        side.addWidget(self.chk_alert)
+        side.addStretch()
+
+        # ==================================================
+        # PAGES
+        # ==================================================
         self.stack = QStackedWidget()
 
-        self.page_camera = CameraGridPage()
-        self.page_dashboard = DashboardPage()
+        self.state = RuntimeState()
+
+        self.page_camera = CameraGridPage(self.state)
+
         self.page_config = CameraConfigPage()
 
-        self.stack.addWidget(self.page_camera)     # index 0
-        self.stack.addWidget(self.page_dashboard) # index 1
-        self.stack.addWidget(self.page_config)    # index 2
-        self.stack.addWidget(QLabel("Tra cứu đơn hàng")) # index 3
-        self.stack.addWidget(QLabel("Danh sách video"))  # index 4
+        # Dashboard chưa load ngay
+        self.page_dashboard = None
 
-        # default page = Camera
-        self.btn_camera.setChecked(True)
-        self.stack.setCurrentIndex(0)
-
-        self.btn_camera.clicked.connect(lambda: self.switch_page(0))
-        self.btn_dashboard.clicked.connect(lambda: self.switch_page(1))
-        self.btn_config.clicked.connect(lambda: self.switch_page(2))
-        self.btn_search.clicked.connect(lambda: self.switch_page(3))
-        self.btn_video.clicked.connect(lambda: self.switch_page(4))
+        self.stack.addWidget(self.page_camera)                 # 0
+        self.stack.addWidget(QWidget())                       # 1 placeholder
+        self.stack.addWidget(self.page_config)                # 2
+        self.stack.addWidget(QLabel("Tra cứu đơn hàng"))      # 3
+        self.page_storage = StoragePage()
+        self.stack.addWidget(self.page_storage)             # 4
+        self.stack.addWidget(QLabel("Nhật ký hệ thống"))      # 5
 
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.stack)
 
-        self.camera_status = {}
-        data = load_config()
-        for cam in data["cameras"]:
-            self.camera_status[cam["id"]] = {
-                "online": False,
-                "status": "CHECKING",
-                "latency": 0,
-                "last_check": "-"
-            }
+        # ==================================================
+        # BUTTON EVENT
+        # ==================================================
+        self.btn_camera.clicked.connect(lambda: self.switch_page(0))
+        self.btn_dashboard.clicked.connect(self.open_dashboard)
+        self.btn_config.clicked.connect(lambda: self.switch_page(2))
+        self.btn_search.clicked.connect(lambda: self.switch_page(3))
+        self.btn_video.clicked.connect(lambda: self.switch_page(4))
+        self.btn_log.clicked.connect(lambda: self.switch_page(5))
 
+        self.btn_camera.setChecked(True)
+        self.stack.setCurrentIndex(0)
+
+        # ==================================================
+        # CAMERA STATUS
+        # ==================================================
+        #self.state = RuntimeState()
+
+        self.qr = QREngine(self.state)
+        self.qr.start_all(data["cameras"])
+
+        self.record = RecordEngine(
+            self.state,
+            data.get("storage_path", "records"),
+            data.get("record_auto_stop_seconds", 300),
+        )
+        self.record.start_all(data["cameras"])
+
+        for cam in data["cameras"]:
+            self.state.add_camera(cam["id"])
+
+        self.network_worker = None
 
         self.timer = QTimer()
-        self.timer.timeout.connect(self.auto_check_camera)
+        self.timer.timeout.connect(self.auto_check)
         self.timer.start(5000)
+        QTimer.singleShot(0, self.auto_check)
 
+        self.ui_timer = QTimer()
+        self.ui_timer.timeout.connect(self.refresh_camera_cards)
+        self.ui_timer.start(1000)
+
+        
+    # ==================================================
+    # SWITCH PAGE
+    # ==================================================
     def switch_page(self, index):
-        for b in [
-            self.btn_camera,
-            self.btn_dashboard,
-            self.btn_config,
-            self.btn_search,
-            self.btn_video
-        ]:
+        for b in self.buttons:
             b.setChecked(False)
 
         sender = self.sender()
         if sender:
             sender.setChecked(True)
 
-        if index == 0:
-            self.page_camera.reload_data(self.camera_status)
-
         self.stack.setCurrentIndex(index)
 
+        if index == 0:
+            self.refresh_camera_cards()
 
-    def auto_check_camera(self):
+    def refresh_camera_cards(self):
+        if self.stack.currentIndex() == 0:
+            self.page_camera.reload_data(
+                self.state.all()
+            )
+
+    # ==================================================
+    # AUTO CHECK CAMERA
+    # ==================================================
+    def auto_check(self):
+        if self.network_worker and self.network_worker.isRunning():
+            return
+
+        cams = load_config()["cameras"]
+
+        self.network_worker = NetworkCheckWorker(cams)
+        self.network_worker.results_ready.connect(self.apply_network_results)
+        self.network_worker.finished.connect(self.network_check_finished)
+        self.network_worker.start()
+
+    def apply_network_results(self, results):
+        for cam_id, name, online, latency in results:
+            old = self.state.get(cam_id)["online"]
+
+            self.state.update_network(
+                cam_id,
+                online,
+                latency
+            )
+
+            if old != online:
+                write_log(
+                    name,
+                    "ONLINE" if online else "OFFLINE"
+                )
+
+        self.refresh_camera_cards()
+
+    def network_check_finished(self):
+        self.network_worker = None
+
+    # ==================================================
+    # ALERT
+    # ==================================================
+    def show_alert(self, title, message):
+        if not self.alert_enabled:
+            return
+
+        self.tray.showMessage(
+            title,
+            message,
+            QSystemTrayIcon.Warning,
+            5000
+        )
+
+    # ==================================================
+    # SAVE ALERT CONFIG
+    # ==================================================
+    def toggle_alert(self):
+        self.alert_enabled = self.chk_alert.isChecked()
+
+        #data = load_config()
+        #data["alert_enabled"] = self.alert_enabled
+        #save_config(data)
+
         data = load_config()
-        cams = data["cameras"]
 
-        def worker(cam):
-            online, latency = ping_host(cam["ip"])
-            return cam["id"], cam["name"], online, latency
+        self.record = RecordEngine(
+            self.state,
+            data["storage_path"],
+            data["record_auto_stop_seconds"]
+        )
 
-        changed = False
+    def open_dashboard(self):
+        # bỏ check hết nút cũ
+        for b in self.buttons:
+            b.setChecked(False)
 
-        with ThreadPoolExecutor(max_workers=20) as executor:
-            results = executor.map(worker, cams)
+        self.btn_dashboard.setChecked(True)
 
-            for cam_id, cam_name, online, latency in results:
-                old = self.camera_status.get(cam_id, {})
+        # chỉ tạo lần đầu
+        if self.page_dashboard is None:
+            self.page_dashboard = DashboardPage()
 
-                now = datetime.now().strftime("%H:%M:%S")
+            # thay placeholder index 1
+            old = self.stack.widget(1)
+            self.stack.removeWidget(old)
+            old.deleteLater()
 
-                new_status = {
-                    "online": online,
-                    "status": "ONLINE" if online else "OFFLINE",
-                    "latency": latency,
-                    "last_check": now
-                }
+            self.stack.insertWidget(1, self.page_dashboard)
 
-                if old.get("online") != online:
-                    write_log(cam_name, new_status["status"])
-                    changed = True
+        self.stack.setCurrentIndex(1)
 
-                self.camera_status[cam_id] = new_status
+    def closeEvent(self, event):
+        try:
+            self.timer.stop()
+            self.ui_timer.stop()
+        except Exception:
+            pass
 
-        self.page_camera.reload_data(self.camera_status)
-        self.page_dashboard.update_stats(self.camera_status)
+        try:
+            self.qr.stop_all()
+        except Exception:
+            pass
 
-        
-# ===================================
+        try:
+            self.record.stop_all()
+        except Exception:
+            pass
+
+        super().closeEvent(event)
+
+# ==================================================
 # RUN APP
-# ===================================
+# ==================================================
 def run_app():
     app = QApplication(sys.argv)
 

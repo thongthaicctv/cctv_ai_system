@@ -5,7 +5,8 @@
 
 import json
 import os
-import socket
+
+import subprocess
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -14,6 +15,10 @@ from PySide6.QtWidgets import (
     QLineEdit, QMessageBox, QFileDialog, QDialog,
     QFormLayout
 )
+from utils.url_helper import camera_rtsp_url, open_rtsp_capture
+
+
+
 
 CONFIG_FILE = "config.json"
 
@@ -47,14 +52,16 @@ class CameraDialog(QDialog):
         self.id_input = QLineEdit()
         self.name_input = QLineEdit()
         self.ip_input = QLineEdit()
-        self.rtsp_input = QLineEdit()
+        self.rtsp_main_input = QLineEdit()
+        self.rtsp_sub_input = QLineEdit()
         self.area_input = QLineEdit()
 
         form = QFormLayout()
         form.addRow("ID Camera:", self.id_input)
         form.addRow("Tên hiển thị:", self.name_input)
         form.addRow("IP:", self.ip_input)
-        form.addRow("RTSP:", self.rtsp_input)
+        form.addRow("RTSP Main:", self.rtsp_main_input)
+        form.addRow("RTSP Sub:", self.rtsp_sub_input)
         form.addRow("Khu vực:", self.area_input)
 
         btn_save = QPushButton("Lưu")
@@ -76,7 +83,13 @@ class CameraDialog(QDialog):
             self.id_input.setText(camera["id"])
             self.name_input.setText(camera["name"])
             self.ip_input.setText(camera["ip"])
-            self.rtsp_input.setText(camera["rtsp"])
+            self.rtsp_main_input.setText(
+                camera.get("rtsp_main", camera.get("rtsp", ""))
+            )
+
+            self.rtsp_sub_input.setText(
+                camera.get("rtsp_sub", "")
+            )
             self.area_input.setText(camera.get("area", ""))
 
     def get_data(self):
@@ -84,7 +97,10 @@ class CameraDialog(QDialog):
             "id": self.id_input.text().strip(),
             "name": self.name_input.text().strip(),
             "ip": self.ip_input.text().strip(),
-            "rtsp": self.rtsp_input.text().strip(),
+
+            "rtsp_main": self.rtsp_main_input.text().strip(),
+            "rtsp_sub": self.rtsp_sub_input.text().strip(),
+
             "area": self.area_input.text().strip(),
             "enabled": True
         }
@@ -106,7 +122,7 @@ class CameraConfigPage(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(6)
         self.table.setHorizontalHeaderLabels([
-            "ID", "Tên camera", "IP", "RTSP", "Khu vực", "Trạng thái"
+            "ID", "Tên camera", "IP", "RTSP SUB", "Khu vực", "Trạng thái"
         ])
 
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -117,6 +133,14 @@ class CameraConfigPage(QWidget):
         self.btn_edit = QPushButton("✏️ Sửa")
         self.btn_delete = QPushButton("🗑️ Xóa")
         self.btn_test = QPushButton("📡 Test")
+
+
+        self.btn_help = QPushButton("📘 Hướng dẫn")
+        self.btn_help.clicked.connect(self.open_guide)
+
+  
+
+
         self.btn_import = QPushButton("📥 Import")
         self.btn_export = QPushButton("📤 Export")
 
@@ -125,6 +149,10 @@ class CameraConfigPage(QWidget):
         btn_row.addWidget(self.btn_edit)
         btn_row.addWidget(self.btn_delete)
         btn_row.addWidget(self.btn_test)
+
+        
+        btn_row.addWidget(self.btn_help)
+        
         btn_row.addStretch()
         btn_row.addWidget(self.btn_import)
         btn_row.addWidget(self.btn_export)
@@ -139,6 +167,9 @@ class CameraConfigPage(QWidget):
         self.btn_edit.clicked.connect(self.edit_camera)
         self.btn_delete.clicked.connect(self.delete_camera)
         self.btn_test.clicked.connect(self.test_camera)
+
+
+
         self.btn_import.clicked.connect(self.import_json)
         self.btn_export.clicked.connect(self.export_json)
 
@@ -155,7 +186,13 @@ class CameraConfigPage(QWidget):
             self.table.setItem(row, 0, QTableWidgetItem(cam["id"]))
             self.table.setItem(row, 1, QTableWidgetItem(cam["name"]))
             self.table.setItem(row, 2, QTableWidgetItem(cam["ip"]))
-            self.table.setItem(row, 3, QTableWidgetItem(cam["rtsp"]))
+            self.table.setItem(
+                row,
+                3,
+                QTableWidgetItem(
+                    "MAIN / SUB"
+                )
+            )
             self.table.setItem(row, 4, QTableWidgetItem(cam.get("area", "")))
 
             status = "Bật" if cam.get("enabled", True) else "Tắt"
@@ -213,31 +250,41 @@ class CameraConfigPage(QWidget):
             return
 
         cam = self.data["cameras"][idx]
-        ip = cam["ip"]
+
+        rtsp = camera_rtsp_url(cam, prefer="sub")
 
         try:
-            socket.setdefaulttimeout(2)
-            socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((ip, 554))
+            cap = open_rtsp_capture(rtsp)
 
-            cam["enabled"] = True
-            save_config(self.data)
-            self.refresh_table()
+            ok, frame = cap.read()
 
-            QMessageBox.information(
-                self,
-                "Kết quả",
-                f"{cam['name']}\nONLINE"
-            )
+            cap.release()
+
+            if ok:
+                cam["enabled"] = True
+
+                save_config(self.data)
+                self.refresh_table()
+
+                QMessageBox.information(
+                    self,
+                    "Kết quả",
+                    f"{cam['name']}\nRTSP OK"
+                )
+
+            else:
+                raise Exception("No frame")
 
         except:
             cam["enabled"] = False
+
             save_config(self.data)
             self.refresh_table()
 
             QMessageBox.warning(
                 self,
                 "Kết quả",
-                f"{cam['name']}\nOFFLINE"
+                f"{cam['name']}\nRTSP FAIL"
             )
 
     def import_json(self):
@@ -272,3 +319,12 @@ class CameraConfigPage(QWidget):
             json.dump(self.data, f, indent=4, ensure_ascii=False)
 
         QMessageBox.information(self, "Thành công", "Đã xuất cấu hình.")
+
+
+    def open_guide(self):
+        file_path = os.path.abspath(
+            "note/huong_dan_cai_dat.txt"
+        )
+
+        if os.path.exists(file_path):
+            os.startfile(file_path)
