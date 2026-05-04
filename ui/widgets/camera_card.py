@@ -89,11 +89,11 @@ class CameraCard(QFrame):
             employee_text = f"{employee_text} | {employee_name}"
 
         if order_code:
-            order_text = f"Don: {order_code}"
+            order_text = f"Đơn vận: {order_code}"
         elif employee_id:
-            order_text = "Don: chờ quét mã"
+            order_text = "Đơn vận: chờ quét mã"
         else:
-            order_text = "Don: -"
+            order_text = "Đơn vận: -"
 
         if info.get("recording") and started_at:
             order_text = f"{order_text} | REC {started_at[-8:]}"
@@ -103,7 +103,7 @@ class CameraCard(QFrame):
         # ép ghi hình khi không có nhân viên
         #self.lbl_employee.setText(f"NV: {employee_text}")
         self.lbl_employee.setText(
-            f"👤 {employee_text or 'N/A'}"
+            f"👤: {employee_text or 'N/A'}"
         )
 
         self.lbl_order.setText(order_text)

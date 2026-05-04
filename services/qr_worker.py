@@ -63,6 +63,11 @@ class QRWorker:
             self.fail_count = 0
             self.state.clear_error(cam_id)
             self.frame_index += 1
+
+            if self.frame_index % 100 == 0:
+                self._clean_seen_cache()
+
+
             self._scan_frame(cam_id, frame)
             time.sleep(float(self.cam.get("qr_scan_interval", DEFAULT_SCAN_INTERVAL)))
 
@@ -220,3 +225,12 @@ class QRWorker:
 
     def stop(self):
         self.running = False
+
+
+    def _clean_seen_cache(self):
+        now = time.time()
+
+        self.last_seen = {
+            k: v for k, v in self.last_seen.items()
+            if now - v < 10
+        }

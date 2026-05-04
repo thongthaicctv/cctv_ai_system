@@ -5,8 +5,9 @@ from datetime import datetime
 
 import cv2
 
-from core.logger import write_log
+
 from utils.url_helper import camera_rtsp_url, open_rtsp_capture
+from system_logger import log
 
 
 DEFAULT_RECORD_AUTO_STOP_SECONDS = 300
@@ -121,7 +122,7 @@ class RecordWorker:
 
         self.state.set_video(cam_id, output_path)
         self.state.clear_error(cam_id)
-        write_log(self.cam["name"], f"REC START {self.current_order}")
+        log(f"{self.cam['name']} START {self.current_order}")
         return True
 
     def _switch_order(self, snapshot):
@@ -154,8 +155,9 @@ class RecordWorker:
 
         self.state.set_video(self.cam["id"], output_path)
         self.state.clear_error(self.cam["id"])
-        write_log(self.cam["name"], f"REC STOP {old_order}")
-        write_log(self.cam["name"], f"REC START {self.current_order}")
+        if old_order != self.current_order:
+            log(f"{self.cam['name']} STOP {old_order}")
+            log(f"{self.cam['name']} START {self.current_order}")
         return True
 
     def _create_writer(self, capture, frame, snapshot):
@@ -213,7 +215,7 @@ class RecordWorker:
                 "AUTO": f"REC AUTO STOP {self.current_order}",
                 "FAIL": f"REC FAIL {self.current_order}",
             }.get(reason, f"REC STOP {self.current_order}")
-            write_log(self.cam["name"], status)
+            log(f"{self.cam['name']} {status}")
 
         if self.writer is not None:
             self.writer.release()

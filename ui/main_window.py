@@ -29,6 +29,12 @@ from ui.pages.dashboard_page import DashboardPage
 
 from ui.pages.storage_page import StoragePage
 
+from services.runtime_cleanup import RuntimeCleanup
+
+from system_logger import log
+
+from ui.pages.log_page import LogPage
+
 
 class NetworkCheckWorker(QThread):
     results_ready = Signal(list)
@@ -55,7 +61,7 @@ class MainWindow(QMainWindow):
         super().__init__()
 
         self.setWindowTitle("CCTV_AI_SYSTEM PRO")
-        self.resize(1600, 900)
+        self.showMaximized()
 
         self.setStyleSheet("""
             QMainWindow{
@@ -183,8 +189,10 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_config)                # 2
         self.stack.addWidget(QLabel("Tra cứu đơn hàng"))      # 3
         self.page_storage = StoragePage()
-        self.stack.addWidget(self.page_storage)             # 4
-        self.stack.addWidget(QLabel("Nhật ký hệ thống"))      # 5
+        self.stack.addWidget(self.page_storage)                 # 4
+
+        self.page_log = LogPage()
+        self.stack.addWidget(self.page_log)                      # 5
 
         main_layout.addWidget(sidebar)
         main_layout.addWidget(self.stack)
@@ -230,6 +238,10 @@ class MainWindow(QMainWindow):
         self.ui_timer = QTimer()
         self.ui_timer.timeout.connect(self.refresh_camera_cards)
         self.ui_timer.start(1000)
+
+        #Xoá bộ nhớ đệm cache
+        self.runtime_cleaner = RuntimeCleanup(interval=30)
+        self.runtime_cleaner.start()
 
         
     # ==================================================
@@ -279,10 +291,7 @@ class MainWindow(QMainWindow):
             )
 
             if old != online:
-                write_log(
-                    name,
-                    "ONLINE" if online else "OFFLINE"
-                )
+                log(f"{name} {'ONLINE' if online else 'OFFLINE'}")
 
         self.refresh_camera_cards()
 

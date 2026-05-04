@@ -6,6 +6,9 @@ from ui.widgets.camera_card import CameraCard
 from ui.preview_window import PreviewWindow
 from utils.url_helper import camera_rtsp_url
 
+from log_panel import LogPanel
+from system_logger import log
+
 class CameraGridPage(QWidget):
     def __init__(self, state):
         super().__init__()
@@ -18,8 +21,15 @@ class CameraGridPage(QWidget):
         self.grid.setSpacing(10)
 
         layout = QVBoxLayout(self)
+
         layout.addWidget(self.title)
         layout.addLayout(self.grid)
+
+        # ===== LOG PANEL =====
+        self.log_panel = LogPanel()
+        self.log_panel.setFixedHeight(180)
+
+        layout.addWidget(self.log_panel)
 
         self.reload_data()
 
@@ -81,11 +91,15 @@ class CameraGridPage(QWidget):
         def handler():
             rtsp = camera_rtsp_url(cam, prefer="main")
 
+            log(f"Preview {cam['name']}")
+
             self.open_preview(cam["name"], rtsp)
 
         return handler
     
     def manual_stop(self, cam_id):
+        log(f"Manual stop CAM-{cam_id}")
+
         self.state.stop_record(
             cam_id,
             clear_employee=False
