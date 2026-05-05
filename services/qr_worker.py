@@ -168,7 +168,7 @@ class QRWorker:
 
         if action == "stop":
             for target_id in target_ids:
-                self.state.stop_record(target_id, clear_employee=True)
+                self.state.stop_record(target_id, clear_employee=False)
             stop_ok()
             return
 
@@ -193,9 +193,11 @@ class QRWorker:
         any_started = False
         for target_id in target_ids:
             state = self.state.get(target_id)
-            if not state.get("employee_id"):
-                self.state.set_error(target_id, "Scan EMP before order")
-                continue
+
+            #tạm thời bỏ quy tắc này để tiện test, sau này có thể thêm lại nếu cần  
+            #if not state.get("employee_id"):
+            #   self.state.set_error(target_id, "Scan EMP before order")
+            #    continue
 
             if state.get("recording") and state.get("order_code") == order_code:
                 continue

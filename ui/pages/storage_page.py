@@ -27,44 +27,62 @@ class StoragePage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(18)
 
-        title = QLabel("CAI DAT LUU VIDEO")
+        title = QLabel("CÀI ĐẶT GHI HÌNH VÀ LƯU TRỮ")
         title.setStyleSheet("font-size:26px;font-weight:bold;color:white;")
         layout.addWidget(title)
 
-        row1 = QHBoxLayout()
-        row1.addWidget(QLabel("Tu dong dung ghi hinh (giay):"))
+        self.btn_save = QPushButton("Lưu cấu hình")
+        self.btn_save.setFixedHeight(40)
+        self.btn_save.setStyleSheet("""
+            QPushButton{
+                background:#1f2937;
+                color:white;
+                border-radius:8px;
+                font-weight:bold;
+            }
+            QPushButton:hover{
+                background:#374151;
+            }
+        """)
+        self.btn_save.clicked.connect(self.save_data)
+
+        layout.addWidget(self.btn_save)
+
+        row = QHBoxLayout()
+        row.setSpacing(12)
+
+        # --- Auto stop ---
+        row.addWidget(QLabel("Tự động dừng (giây):"))
 
         self.spin_stop = QSpinBox()
         self.spin_stop.setRange(10, 7200)
         self.spin_stop.setValue(300)
-        self.spin_stop.setFixedWidth(180)
+        self.spin_stop.setFixedWidth(120)
+        row.addWidget(self.spin_stop)
 
-        row1.addStretch()
-        row1.addWidget(self.spin_stop)
-        layout.addLayout(row1)
-
-        row2 = QHBoxLayout()
-        row2.addWidget(QLabel("Thu muc goc luu video:"))
+        # --- Path ---
+        row.addSpacing(20)
+        row.addWidget(QLabel("Thư mục:"))
 
         self.txt_path = QLineEdit()
-        row2.addWidget(self.txt_path, 1)
+        row.addWidget(self.txt_path, 1)
 
-        btn_browse = QPushButton("Chon")
+        btn_browse = QPushButton("Chọn")
+        btn_browse.setFixedWidth(100)
         btn_browse.clicked.connect(self.pick_folder)
-        btn_browse.setFixedWidth(110)
-        row2.addWidget(btn_browse)
+        row.addWidget(btn_browse)
 
-        layout.addLayout(row2)
+        layout.addLayout(row)
 
-        self.btn_save = QPushButton("Luu cau hinh")
-        self.btn_save.clicked.connect(self.save_data)
-        layout.addWidget(self.btn_save)
+       
 
-        mapping_title = QLabel("Bang Mapping Scan -> Record")
+        
+
+        mapping_title = QLabel("Bảng Mapping Scan -> Record")
         mapping_title.setStyleSheet("font-size:18px;font-weight:bold;color:white;")
         layout.addWidget(mapping_title)
 
-        mapping_hint = QLabel("Hang = camera quet QR | Cot = camera ghi hinh main stream")
+        mapping_hint = QLabel("Hàng = Chọn camera quét QR | Cột = Chọn camera ghi hình")
         mapping_hint.setStyleSheet("color:#9ca3af;font-size:12px;")
         layout.addWidget(mapping_hint)
 
