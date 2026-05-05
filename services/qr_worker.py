@@ -1,12 +1,14 @@
 import time
 
+from core.config_manager import load_config
+from services.audio_service import employee_ok, order_ok, stop_ok
 from services.qr_decoder import (
     decode_qr_texts,
     decode_qr_texts_fast,
     parse_qr_command,
 )
 from utils.url_helper import camera_rtsp_url, open_rtsp_capture
-from services.audio_service import employee_ok, order_ok, stop_ok
+
 
 DEFAULT_SCAN_INTERVAL = 0.03
 DEFAULT_DUPLICATE_SECONDS = 5
@@ -19,7 +21,6 @@ SLOW_SCAN_EVERY_FRAMES = 25
 
 
 class QRWorker:
-
     def __init__(self, cam, state):
         self.cam = cam
         self.state = state
@@ -32,7 +33,6 @@ class QRWorker:
 
     def run(self):
         cam_id = self.cam["id"]
-
         rtsp = camera_rtsp_url(self.cam, prefer="sub")
 
         if not rtsp:
@@ -67,7 +67,6 @@ class QRWorker:
             if self.frame_index % 100 == 0:
                 self._clean_seen_cache()
 
-
             self._scan_frame(cam_id, frame)
             time.sleep(float(self.cam.get("qr_scan_interval", DEFAULT_SCAN_INTERVAL)))
 
@@ -80,14 +79,8 @@ class QRWorker:
         self._release_capture()
         self.cap = open_rtsp_capture(
             rtsp,
-            open_timeout_msec=self.cam.get(
-                "rtsp_open_timeout_msec",
-                RTSP_OPEN_TIMEOUT_MSEC,
-            ),
-            read_timeout_msec=self.cam.get(
-                "rtsp_read_timeout_msec",
-                RTSP_READ_TIMEOUT_MSEC,
-            ),
+            open_timeout_msec=self.cam.get("rtsp_open_timeout_msec", RTSP_OPEN_TIMEOUT_MSEC),
+            read_timeout_msec=self.cam.get("rtsp_read_timeout_msec", RTSP_READ_TIMEOUT_MSEC),
         )
 
         if self.cap.isOpened():
@@ -146,32 +139,21 @@ class QRWorker:
 
     def _center_roi(self, frame):
         h, w = frame.shape[:2]
-
         x1 = int(w * 0.2)
         x2 = int(w * 0.8)
         y1 = int(h * 0.2)
         y2 = int(h * 0.8)
-
         return frame[y1:y2, x1:x2]
 
     def _full_scan_every_frames(self):
-        return max(
-            1,
-            int(self.cam.get("qr_full_scan_every_frames", FULL_SCAN_EVERY_FRAMES)),
-        )
+        return max(1, int(self.cam.get("qr_full_scan_every_frames", FULL_SCAN_EVERY_FRAMES)))
 
     def _slow_scan_every_frames(self):
-        return max(
-            1,
-            int(self.cam.get("qr_slow_scan_every_frames", SLOW_SCAN_EVERY_FRAMES)),
-        )
+        return max(1, int(self.cam.get("qr_slow_scan_every_frames", SLOW_SCAN_EVERY_FRAMES)))
 
     def _should_accept(self, text):
         now = time.time()
-        duplicate_seconds = float(
-            self.cam.get("qr_duplicate_seconds", DEFAULT_DUPLICATE_SECONDS)
-        )
-
+        duplicate_seconds = float(self.cam.get("qr_duplicate_seconds", DEFAULT_DUPLICATE_SECONDS))
         last_time = self.last_seen.get(text)
         if last_time and now - last_time < duplicate_seconds:
             return False
@@ -179,22 +161,25 @@ class QRWorker:
         self.last_seen[text] = now
         return True
 
-    def _handle_command(self, cam_id, text):
+    def _handle_command(self, scan_cam_id, text):
         command = parse_qr_command(text)
         action = command["action"]
+        target_ids = self._target_camera_ids(scan_cam_id)
 
         if action == "stop":
-            self.state.stop_record(cam_id, clear_employee=False)
+            for target_id in target_ids:
+                self.state.stop_record(target_id, clear_employee=True)
             stop_ok()
             return
 
         if action == "employee":
-            self.state.assign_employee(
-                cam_id,
-                employee_id=command.get("employee_id", ""),
-                employee_name=command.get("employee_name", ""),
-                shift_code=command.get("shift_code", ""),
-            )
+            for target_id in target_ids:
+                self.state.assign_employee(
+                    target_id,
+                    employee_id=command.get("employee_id", ""),
+                    employee_name=command.get("employee_name", ""),
+                    shift_code=command.get("shift_code", ""),
+                )
             employee_ok()
             return
 
@@ -204,33 +189,32 @@ class QRWorker:
         order_code = command.get("order_code", "")
         if not order_code:
             return
-        #ép ghi hình khi không có nhân viên
-        #st = self.state.get(cam_id)
-        #if not st.get("employee_id"):
-        #    self.state.set_error(cam_id, "Scan EMP before order")
-        #    return
 
-        st = self.state.get(cam_id)
+        any_started = False
+        for target_id in target_ids:
+            state = self.state.get(target_id)
+            if not state.get("employee_id"):
+                self.state.set_error(target_id, "Scan EMP before order")
+                continue
 
-        # 🔥 Nếu đang ghi và trùng đơn → bỏ qua
-        if st.get("recording") and st.get("order_code") == order_code:
-            return
+            if state.get("recording") and state.get("order_code") == order_code:
+                continue
 
-        self.state.start_record(
-            cam_id,
-            order_code=order_code,
-        )
+            self.state.start_record(target_id, order_code=order_code)
+            any_started = True
 
-        order_ok()
+        if any_started:
+            order_ok()
+
+    def _target_camera_ids(self, scan_cam_id):
+        data = load_config()
+        mapping = data.get("record_mapping", {})
+        targets = mapping.get(str(scan_cam_id), [])
+        return targets or [str(scan_cam_id)]
 
     def stop(self):
         self.running = False
 
-
     def _clean_seen_cache(self):
         now = time.time()
-
-        self.last_seen = {
-            k: v for k, v in self.last_seen.items()
-            if now - v < 10
-        }
+        self.last_seen = {k: v for k, v in self.last_seen.items() if now - v < 10}

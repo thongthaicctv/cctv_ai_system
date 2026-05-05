@@ -189,6 +189,7 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_config)                # 2
         self.stack.addWidget(QLabel("Tra cứu đơn hàng"))      # 3
         self.page_storage = StoragePage()
+        self.page_storage.settings_saved.connect(self.apply_storage_settings)
         self.stack.addWidget(self.page_storage)                 # 4
 
         self.page_log = LogPage()
@@ -317,17 +318,14 @@ class MainWindow(QMainWindow):
     # ==================================================
     def toggle_alert(self):
         self.alert_enabled = self.chk_alert.isChecked()
-
-        #data = load_config()
-        #data["alert_enabled"] = self.alert_enabled
-        #save_config(data)
-
         data = load_config()
+        data["alert_enabled"] = self.alert_enabled
+        save_config(data)
 
-        self.record = RecordEngine(
-            self.state,
-            data["storage_path"],
-            data["record_auto_stop_seconds"]
+    def apply_storage_settings(self, data):
+        self.record.update_settings(
+            data.get("storage_path", "records"),
+            data.get("record_auto_stop_seconds", 300),
         )
 
     def open_dashboard(self):

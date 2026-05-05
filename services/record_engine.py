@@ -47,6 +47,14 @@ class RecordEngine:
         for cam in cameras:
             self.start_camera(cam)
 
+    def update_settings(self, storage_path, auto_stop_seconds):
+        self.storage_path = storage_path
+        self.auto_stop_seconds = auto_stop_seconds
+
+        for worker in self.workers.values():
+            worker.storage_path = storage_path
+            worker.auto_stop_seconds = auto_stop_seconds
+
     def stop_all(self):
         for cam_id in list(self.workers.keys()):
             self.stop_camera(cam_id)
