@@ -3,6 +3,7 @@ from PySide6.QtCore import QTimer
 import os
 from PySide6.QtGui import QTextCursor
 
+
 class LogPanel(QWidget):
     def __init__(self):
         super().__init__()

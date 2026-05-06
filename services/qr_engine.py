@@ -1,5 +1,20 @@
 import threading
 from services.qr_worker import QRWorker
+ENGINE_INSTANCE = None
+
+
+
+
+
+
+
+
+def manual_qr_command(text):
+
+    global ENGINE_INSTANCE
+
+    if ENGINE_INSTANCE:
+        ENGINE_INSTANCE.handle_manual_command(text)
 
 
 class QREngine:
@@ -8,6 +23,9 @@ class QREngine:
         self.state = state
         self.workers = {}
         self.threads = {}
+
+        global ENGINE_INSTANCE
+        ENGINE_INSTANCE = self
 
     def start_camera(self, cam):
         if not cam.get("enabled", True):
@@ -43,3 +61,14 @@ class QREngine:
     def stop_all(self):
         for cam_id in list(self.workers.keys()):
             self.stop_camera(cam_id)
+
+               
+
+    def handle_manual_command(self, text):
+
+        for worker in self.workers.values():
+            worker._handle_command(
+                "manual",
+                text
+            )
+            break

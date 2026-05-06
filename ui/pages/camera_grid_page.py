@@ -1,4 +1,10 @@
-from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QGridLayout
+from PySide6.QtWidgets import (
+    QWidget,
+    QLabel,
+    QVBoxLayout,
+    QGridLayout,
+    QLineEdit
+)
 from PySide6.QtGui import QFont
 
 from core.config_manager import load_config
@@ -25,9 +31,46 @@ class CameraGridPage(QWidget):
         layout.addWidget(self.title)
         layout.addLayout(self.grid)
 
+        # ===== CMD BAR =====
+        self.cmd_input = QLineEdit()
+
+        self.cmd_input.setPlaceholderText(
+            "Hướng dẫn: c01stop=dừng; c01emp:NV001=Gán NV001; c01abcd1234xyz=Ghi với mã đơn hàng abcd1234xyz"
+        )
+
+        self.cmd_input.setFixedHeight(38)
+
+        self.cmd_input.setStyleSheet("""
+        QLineEdit{
+            background:#0b0f14;
+            color:#00ff99;
+
+            border:2px solid #00aa66;
+            border-radius:8px;
+
+            padding-left:12px;
+
+            font-size:14px;
+            font-weight:bold;
+
+            selection-background-color:#00aa66;
+        }
+
+        QLineEdit:focus{
+            border:2px solid #00ff99;
+            background:#101820;
+        }
+        """)
+
+        self.cmd_input.returnPressed.connect(
+            self.send_cmd
+        )
+
+        layout.addWidget(self.cmd_input)
+
         # ===== LOG PANEL =====
         self.log_panel = LogPanel()
-        self.log_panel.setFixedHeight(180)
+        self.log_panel.setFixedHeight(120)
 
         layout.addWidget(self.log_panel)
 
@@ -104,3 +147,22 @@ class CameraGridPage(QWidget):
             cam_id,
             clear_employee=False
         )
+
+
+    def send_cmd(self):
+        text = self.cmd_input.text().strip()
+
+        if not text:
+            return
+
+        try:
+            from services.qr_engine import manual_qr_command
+
+            manual_qr_command(text)
+
+            log(f"CMD {text}")
+
+        except Exception as e:
+            log(f"CMD ERROR {e}")
+
+        self.cmd_input.clear()

@@ -161,25 +161,153 @@ class QRWorker:
         self.last_seen[text] = now
         return True
 
+
+
+    def _parse_manual_cmd(self, text):
+
+        text = text.strip().lower()
+
+        if len(text) < 4:
+            return None
+
+        prefix = text[:3]
+
+        # c01 / s01
+        if prefix[0] not in ("c", "s"):
+            return None
+
+        if not prefix[1:].isdigit():
+            return None
+
+        body = text[3:].strip()
+
+        return prefix, body
+
+
+    def _find_camera_by_sub(self, prefix):
+
+        cam_no = prefix[1:]   # c02 -> 02
+
+        data = load_config()
+
+        for cam in data["cameras"]:
+
+            cam_id = str(cam["id"]).zfill(2)
+
+            if cam_id == cam_no:
+                return str(cam["id"])
+
+        return None
+
     def _handle_command(self, scan_cam_id, text):
+        # ==================================================
+        # MANUAL CMD
+        # ==================================================
+        cmd = self._parse_manual_cmd(text)
+
+        if cmd:
+
+            prefix, body = cmd
+
+            scan_cam_id = self._find_camera_by_sub(prefix)
+
+            if not scan_cam_id:
+                print("CMD CAMERA NOT FOUND", prefix)
+                return
+
+            target_ids = self._target_camera_ids(scan_cam_id)
+
+            # STOP
+            if body.startswith("stop"):
+
+                for target_id in target_ids:
+
+                    self.state.stop_record(
+                        target_id,
+                        clear_employee=False
+                    )
+
+                stop_ok()
+
+                print("CMD STOP", target_ids)
+
+                return
+
+            # EMP
+            if body.startswith("emp:"):
+
+                emp = body.replace("emp:", "").strip()
+
+                for target_id in target_ids:
+
+                    self.state.assign_employee(
+                        target_id,
+                        employee_id=emp,
+                        employee_name=""
+                    )
+
+                employee_ok()
+
+                print("CMD EMP", target_ids, emp)
+
+                return
+
+            # ORDER
+            order_code = body.strip()
+
+            if not order_code:
+                return
+
+            for target_id in target_ids:
+
+                st = self.state.get(target_id)
+
+                # chống scan trùng
+                if st.get("recording") and st.get("order_code") == order_code:
+                    continue
+
+                self.state.start_record(
+                    target_id,
+                    order_code=order_code
+                )
+
+            order_ok()
+
+            print("CMD RECORD", target_ids, order_code)
+
+            return
+
         command = parse_qr_command(text)
         action = command["action"]
+        
+
         target_ids = self._target_camera_ids(scan_cam_id)
 
+                                                                                                       
+
         if action == "stop":
+
             for target_id in target_ids:
-                self.state.stop_record(target_id, clear_employee=False)
+
+                self.state.stop_record(
+                    target_id,
+                    clear_employee=False
+                )
+
             stop_ok()
             return
 
         if action == "employee":
+
             for target_id in target_ids:
+
                 self.state.assign_employee(
                     target_id,
                     employee_id=command.get("employee_id", ""),
                     employee_name=command.get("employee_name", ""),
                     shift_code=command.get("shift_code", ""),
                 )
+
             employee_ok()
             return
 

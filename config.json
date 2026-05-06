@@ -15,26 +15,14 @@
         "4": [
             "4"
         ],
-        "5": [
-            "5"
-        ],
-        "6": [
-            "6"
-        ],
-        "7": [
-            "7"
-        ],
-        "8": [
-            "8"
-        ],
-        "9": [
-            "9"
-        ],
         "10": [
             "10"
         ],
         "11": [
             "11"
+        ],
+        "5": [
+            "5"
         ]
     },
     "cameras": [
@@ -75,51 +63,6 @@
             "enabled": true
         },
         {
-            "id": "5",
-            "name": "SI-1",
-            "ip": "192.168.23.102",
-            "rtsp_main": "rtsp://admin:Antn2016@192.168.23.102:554/live/0/MAIN",
-            "rtsp_sub": "rtsp://admin:Antn2016@192.168.23.102:554/live/0/sub",
-            "area": "Dong Si",
-            "enabled": false
-        },
-        {
-            "id": "6",
-            "name": "Si-2",
-            "ip": "192.168.23.105",
-            "rtsp_main": "rtsp://admin:Antn2016@192.168.23.105:554/live/0/MAIN",
-            "rtsp_sub": "rtsp://admin:Antn2016@192.168.23.105:554/live/0/sub",
-            "area": "SI-2",
-            "enabled": true
-        },
-        {
-            "id": "7",
-            "name": "Si-3",
-            "ip": "192.168.23.103",
-            "rtsp_main": "rtsp://admin:Antn2016@192.168.23.103:554/live/0/MAIN",
-            "rtsp_sub": "rtsp://admin:Antn2016@192.168.23.103:554/live/0/sub",
-            "area": "Dong Si",
-            "enabled": true
-        },
-        {
-            "id": "8",
-            "name": "Si-4",
-            "ip": "192.168.23.101",
-            "rtsp_main": "rtsp://admin:Antn2016@192.168.23.101:554/live/0/MAIN",
-            "rtsp_sub": "rtsp://admin:Antn2016@192.168.23.103:554/live/0/sub",
-            "area": "Dong Si",
-            "enabled": true
-        },
-        {
-            "id": "9",
-            "name": "SI-5",
-            "ip": "192.168.23.104",
-            "rtsp_main": "rtsp://recorder:Antn2016@192.168.23.104/:554/Streaming/Channels/101",
-            "rtsp_sub": "rtsp://recorder:Antn2016@192.168.23.104/:554/Streaming/Channels/102",
-            "area": "Dong Si",
-            "enabled": true
-        },
-        {
             "id": "10",
             "name": "Giao Hang",
             "ip": "192.168.23.23",
@@ -135,6 +78,15 @@
             "rtsp_main": "RTSP://admin:Antn2016@192.168.110.185:554/live/0/MAIN",
             "rtsp_sub": "RTSP://admin:Antn2016@192.168.110.185:554/live/0/SUB",
             "area": "debug",
+            "enabled": true
+        },
+        {
+            "id": "5",
+            "name": "si-1",
+            "ip": "192.168.23.15",
+            "rtsp_main": "rtsp://admin:Antn2016@192.168.23.15:554/live/0/MAIN",
+            "rtsp_sub": "rtsp://admin:Antn2016@192.168.23.15:554/live/0/sub",
+            "area": "đóng sỉ",
             "enabled": true
         }
     ]
