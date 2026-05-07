@@ -143,11 +143,11 @@ class MainWindow(QMainWindow):
         side.addWidget(logo)
         side.addSpacing(10)
 
-        self.btn_camera = QPushButton("🎥 Camera")
+        self.btn_camera = QPushButton("🎥 Trạng thái Camera ghi hình")
         self.btn_dashboard = QPushButton("🏠 Tổng quan")
         self.btn_config = QPushButton("⚙️ Cấu hình Camera")
-        self.btn_search = QPushButton("🔍 Tra cứu")
-        self.btn_video = QPushButton("💾Cài đặt lưu video")
+        self.btn_search = QPushButton("🔍 Quản lý nhân sự và tra cứu")
+        self.btn_video = QPushButton("💾Cài đặt ghi và lưu video")
         self.btn_log = QPushButton("📜 Nhật ký")
 
         self.buttons = [

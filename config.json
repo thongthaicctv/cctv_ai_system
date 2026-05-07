@@ -1,6 +1,6 @@
 {
     "alert_enabled": false,
-    "storage_path": "F:/VIDEO TEST",
+    "storage_path": "G:/",
     "record_auto_stop_seconds": 93,
     "record_mapping": {
         "1": [

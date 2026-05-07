@@ -2,6 +2,8 @@ from PySide6.QtWidgets import QWidget, QLabel, QVBoxLayout, QGridLayout, QFrame
 from PySide6.QtCore import QTimer, Qt
 import psutil
 import shutil
+import json
+import os
 
 try:
     import GPUtil
@@ -16,6 +18,8 @@ class InfoCard(QFrame):
         super().__init__()
 
         self.setMinimumHeight(130)
+
+        
 
         self.setStyleSheet("""
         QFrame{
@@ -59,6 +63,8 @@ class DashboardPage(QWidget):
     def __init__(self):
         super().__init__()
 
+        self.record_path = self.load_storage_path()
+
         self.cards = {}
 
         grid = QGridLayout(self)
@@ -85,10 +91,23 @@ class DashboardPage(QWidget):
         cpu = psutil.cpu_percent()
         ram = psutil.virtual_memory().percent
 
-        disk = shutil.disk_usage("C:\\")
-        used = round(disk.used / 1024 / 1024 / 1024)
-        total = round(disk.total / 1024 / 1024 / 1024)
-        free = total - used
+        try:
+            self.record_path = self.load_storage_path()
+
+            drive = os.path.splitdrive(self.record_path)[0] + "\\"
+
+            disk = shutil.disk_usage(drive)
+
+            used = round(disk.used / 1024 / 1024 / 1024)
+            total = round(disk.total / 1024 / 1024 / 1024)
+            free = round(disk.free / 1024 / 1024 / 1024)
+
+        except Exception as e:
+            print("DISK ERROR:", e)
+
+            used = 0
+            total = 0
+            free = 0
 
         gpu = 0
         gpu_text = "N/A"
@@ -123,3 +142,14 @@ class DashboardPage(QWidget):
         self.cards["DISK"].lbl_value.setStyleSheet(
             f"font-size:34px;font-weight:bold;color:{'red' if free < 10 else '#00ffaa'};"
         )
+
+    def load_storage_path(self):
+        try:
+            with open("config.json", "r", encoding="utf-8") as f:
+                config = json.load(f)
+
+            return config.get("storage_path", "C:\\")
+
+        except Exception as e:
+            print("LOAD CONFIG ERROR:", e)
+            return "C:\\"
