@@ -35,6 +35,8 @@ from system_logger import log
 
 from ui.pages.log_page import LogPage
 
+from hr.hr_page import HRPage
+
 
 class NetworkCheckWorker(QThread):
     results_ready = Signal(list)
@@ -187,7 +189,8 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(self.page_camera)                 # 0
         self.stack.addWidget(QWidget())                       # 1 placeholder
         self.stack.addWidget(self.page_config)                # 2
-        self.stack.addWidget(QLabel("Tra cứu đơn hàng"))      # 3
+        self.page_hr = HRPage()
+        self.stack.addWidget(self.page_hr)                    # 3
         self.page_storage = StoragePage()
         self.page_storage.settings_saved.connect(self.apply_storage_settings)
         self.stack.addWidget(self.page_storage)                 # 4

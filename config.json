@@ -1,26 +1,21 @@
 {
     "alert_enabled": false,
-    "storage_path": "D:/Video 3",
+    "storage_path": "F:/VIDEO TEST",
     "record_auto_stop_seconds": 93,
     "record_mapping": {
         "1": [
-            "1"
-        ],
-        "2": [
-            "2"
-        ],
-        "3": [
-            "3"
-        ],
-        "4": [
-            "4"
-        ],
-        "10": [
+            "1",
+            "2",
             "10"
         ],
-        "11": [
-            "11"
+        "2": [
+            "3",
+            "4"
         ],
+        "3": [],
+        "4": [],
+        "10": [],
+        "11": [],
         "5": [
             "5"
         ]
@@ -33,7 +28,7 @@
             "rtsp_main": "rtsp://admin:123456@192.168.23.12:554/Streaming/Channels/101",
             "rtsp_sub": "rtsp://admin:123456@192.168.23.12:554/Streaming/Channels/102",
             "area": "ECOM",
-            "enabled": true
+            "enabled": false
         },
         {
             "id": "2",
@@ -42,7 +37,7 @@
             "rtsp_main": "rtsp://admin:123456@192.168.23.11:554/Streaming/Channels/101",
             "rtsp_sub": "rtsp://admin:123456@192.168.23.11:554/Streaming/Channels/102",
             "area": "Ecom",
-            "enabled": true
+            "enabled": false
         },
         {
             "id": "3",
@@ -51,7 +46,7 @@
             "rtsp_main": "rtsp://recorder:Antn2016@192.168.23.13:249/Streaming/Channels/101",
             "rtsp_sub": "rtsp://recorder:Antn2016@192.168.23.13:249/Streaming/Channels/102",
             "area": "ECOM",
-            "enabled": true
+            "enabled": false
         },
         {
             "id": "4",
