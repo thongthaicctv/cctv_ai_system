@@ -1,7 +1,9 @@
 import threading
 
 from services.record_worker import DEFAULT_RECORD_AUTO_STOP_SECONDS, RecordWorker
+from PySide6.QtWidgets import QApplication
 
+from core.logger import write_license_log
 
 class RecordEngine:
     def __init__(self, state, storage_path, auto_stop_seconds=DEFAULT_RECORD_AUTO_STOP_SECONDS):
@@ -12,10 +14,42 @@ class RecordEngine:
         self.threads = {}
 
     def start_camera(self, cam):
+
         if not cam.get("enabled", True):
             return
 
+        # =========================
+        # LICENSE CHECK
+        # =========================
+        license_manager = QApplication.instance().license_manager
+
+        max_camera = int(
+            license_manager.data.get("max_camera", 0)
+        )
+
+        active_camera = len(self.workers)
+
+        print("LICENSE MAX:", max_camera)
+        print("ACTIVE WORKERS:", active_camera)
+
+        if active_camera >= max_camera:
+
+            msg = (
+                f"LICENSE LIMIT BLOCK: "
+                f"{active_camera}/{max_camera}"
+            )
+
+            print(msg)
+
+            write_license_log(msg)
+
+            return
+
+        # =========================
+        # START WORKER
+        # =========================
         cam_id = cam["id"]
+
         if cam_id in self.workers:
             return
 
@@ -30,10 +64,11 @@ class RecordEngine:
             target=worker.run,
             daemon=True,
         )
-        thread.start()
 
         self.workers[cam_id] = worker
         self.threads[cam_id] = thread
+
+        thread.start()
 
     def stop_camera(self, cam_id):
         if cam_id not in self.workers:
@@ -44,8 +79,51 @@ class RecordEngine:
         self.threads.pop(cam_id, None)
 
     def start_all(self, cameras):
-        for cam in cameras:
+
+      
+
+        # clear old
+        self.workers = {}
+        self.threads = {}
+
+        license_manager = QApplication.instance().license_manager
+
+        max_camera = int(
+            license_manager.data.get("max_camera", 0)
+        )
+
+        enabled_cameras = [
+            cam for cam in cameras
+            if cam.get("enabled", True)
+        ]
+
+        print(
+            f"LICENSE START LIMIT: "
+            f"{max_camera}/{len(enabled_cameras)}"
+        )
+
+        # HARD LIMIT
+        limited_cameras = enabled_cameras[:max_camera]
+
+        print("START_ALL RUNNING")
+        print("LIMITED CAMERAS:")
+        print([c["id"] for c in limited_cameras])
+
+        for cam in limited_cameras:
+
             self.start_camera(cam)
+
+        # debug blocked
+        for cam in enabled_cameras[max_camera:]:
+
+            msg = (
+                f"LICENSE BLOCK CAMERA: "
+                f"{cam.get('id')}"
+            )
+
+            print(msg)
+
+            write_license_log(msg)
 
     def update_settings(self, storage_path, auto_stop_seconds):
         self.storage_path = storage_path

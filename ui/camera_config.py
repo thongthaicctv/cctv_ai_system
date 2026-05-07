@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from utils.url_helper import camera_rtsp_url, open_rtsp_capture
 
+from PySide6.QtWidgets import QApplication
 
 
 
@@ -208,11 +209,85 @@ class CameraConfigPage(QWidget):
     # ACTIONS
     # =============================
     def add_camera(self):
+
         dlg = CameraDialog()
+
         if dlg.exec():
+
+            # reload config mới nhất
+            self.data = load_config()
+
+            license_manager = QApplication.instance().license_manager
+
+            max_camera = int(
+                license_manager.data.get("max_camera", 0)
+            )
+
+            current_camera = len(
+                self.data.get("cameras", [])
+            )
+
+            print("MAX CAMERA:", max_camera)
+            print("CURRENT CAMERA:", current_camera)
+
+            print(license_manager.data)
+            print(type(max_camera))
+
+            # check limit
+            if current_camera >= max_camera:
+
+                msg = QMessageBox(self)
+
+                msg.setWindowTitle("Giới hạn License")
+
+                msg.setIcon(QMessageBox.Warning)
+
+                msg.setText(
+                    f"License hiện tại chỉ cho phép tối đa "
+                    f"{max_camera} camera."
+                )
+
+                msg.setInformativeText(
+                    f"Device ID:\n"
+                    f"{license_manager.device_id}\n\n"
+                    f"Vui lòng liên hệ 0904143113 để mở rộng license để thêm camera mới."
+                )
+                msg.setStyleSheet("""
+                QMessageBox {
+                    background-color: #202020;
+                }
+
+                QLabel {
+                    color: white;
+                    font-size: 13px;
+                    min-width: 320px;
+                }
+
+                QPushButton {
+                    background-color: #2d2d2d;
+                    color: white;
+                    border: 1px solid #555;
+                    border-radius: 6px;
+                    padding: 6px 12px;
+                    min-width: 80px;
+                    min-height: 30px;
+                }
+
+                QPushButton:hover {
+                    background-color: #3a3a3a;
+                }
+                """)
+                msg.exec()
+
+                return
+
+            # add camera
             cam = dlg.get_data()
+
             self.data["cameras"].append(cam)
+
             save_config(self.data)
+
             self.refresh_table()
 
     def edit_camera(self):
@@ -288,6 +363,7 @@ class CameraConfigPage(QWidget):
             )
 
     def import_json(self):
+
         file, _ = QFileDialog.getOpenFileName(
             self,
             "Import Config",
@@ -299,10 +375,89 @@ class CameraConfigPage(QWidget):
             return
 
         with open(file, "r", encoding="utf-8") as f:
-            self.data = json.load(f)
+            import_data = json.load(f)
+
+        # =========================
+        # LICENSE CHECK
+        # =========================
+        license_manager = QApplication.instance().license_manager
+
+        max_camera = int(
+            license_manager.data.get("max_camera", 0)
+        )
+
+        cams = import_data.get("cameras", [])
+
+        total_camera = len(cams)
+
+        print("IMPORT CAMERA:", total_camera)
+        print("MAX CAMERA:", max_camera)
+
+        # block import
+        if total_camera > max_camera:
+
+            msg = QMessageBox(self)
+
+            msg.setWindowTitle("Giới hạn License")
+
+            msg.setIcon(QMessageBox.Warning)
+
+            msg.setText(
+                f"File import có {total_camera} camera.\n\n"
+                f"License hiện tại chỉ cho phép "
+                f"tối đa {max_camera} camera."
+            )
+
+            msg.setInformativeText(
+                f"Device ID:\n"
+                f"{license_manager.device_id}\n\n"
+                f"Vui lòng mở rộng license để import thêm camera."
+            )
+
+            msg.setStyleSheet("""
+            QMessageBox {
+                background-color: #202020;
+            }
+
+            QLabel {
+                color: white;
+                font-size: 13px;
+                min-width: 320px;
+            }
+
+            QPushButton {
+                background-color: #2d2d2d;
+                color: white;
+                border: 1px solid #555;
+                border-radius: 6px;
+                padding: 6px 12px;
+                min-width: 80px;
+                min-height: 30px;
+            }
+
+            QPushButton:hover {
+                background-color: #3a3a3a;
+            }
+            """)
+
+            msg.exec()
+
+            return
+
+        # =========================
+        # IMPORT
+        # =========================
+        self.data = import_data
 
         save_config(self.data)
+
         self.refresh_table()
+
+        QMessageBox.information(
+            self,
+            "Import",
+            "Đã import cấu hình camera thành công."
+        )
 
     def export_json(self):
         file, _ = QFileDialog.getSaveFileName(

@@ -12,3 +12,16 @@ def write_log(camera_name, status):
 
     with open(LOG_FILE, "a", encoding="utf-8") as f:
         f.write(line)
+
+def write_license_log(message):
+
+    os.makedirs("logs", exist_ok=True)
+
+    log_file = "logs/license.log"
+
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    line = f"{now} | {message}\n"
+
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(line)

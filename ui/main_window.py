@@ -58,6 +58,8 @@ class NetworkCheckWorker(QThread):
         self.results_ready.emit(results)
 
 
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()

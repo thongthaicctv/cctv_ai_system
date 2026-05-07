@@ -1,4 +1,5 @@
 import time
+from PySide6.QtWidgets import QApplication
 
 from core.config_manager import load_config
 from services.audio_service import employee_ok, order_ok, stop_ok
@@ -9,6 +10,7 @@ from services.qr_decoder import (
 )
 from utils.url_helper import camera_rtsp_url, open_rtsp_capture
 
+from core.logger import write_license_log
 
 DEFAULT_SCAN_INTERVAL = 0.03
 DEFAULT_DUPLICATE_SECONDS = 5
@@ -260,6 +262,36 @@ class QRWorker:
 
             for target_id in target_ids:
 
+                # =========================
+                # LICENSE CHECK
+                # =========================
+                app = QApplication.instance()
+
+                record_engine = getattr(app, "record_engine", None)
+
+                if not record_engine:
+
+                    print("LICENSE RECORD BLOCK: ENGINE NOT FOUND")
+
+                    continue
+
+                worker = record_engine.workers.get(str(target_id))
+
+                if not worker:
+
+                    msg = f"LICENSE RECORD BLOCK: {target_id}"
+
+                    print(msg)
+
+                    write_license_log(msg)
+
+                    self.state.stop_record(
+                        target_id,
+                        clear_employee=False
+                    )
+
+                    continue
+
                 st = self.state.get(target_id)
 
                 # chống scan trùng
@@ -320,17 +352,42 @@ class QRWorker:
 
         any_started = False
         for target_id in target_ids:
-            state = self.state.get(target_id)
 
-            #tạm thời bỏ quy tắc này để tiện test, sau này có thể thêm lại nếu cần  
-            #if not state.get("employee_id"):
-            #   self.state.set_error(target_id, "Scan EMP before order")
-            #    continue
+            # =========================
+            # LICENSE CHECK
+            # =========================
+            app = QApplication.instance()
+
+            record_engine = getattr(app, "record_engine", None)
+
+            if not record_engine:
+
+                print("LICENSE RECORD BLOCK: ENGINE NOT FOUND")
+
+                continue
+
+            worker = record_engine.workers.get(str(target_id))
+
+            if not worker:
+
+                msg = f"LICENSE RECORD BLOCK: {target_id}"
+
+                print(msg)
+
+                write_license_log(msg)
+
+                continue
+
+            state = self.state.get(target_id)
 
             if state.get("recording") and state.get("order_code") == order_code:
                 continue
 
-            self.state.start_record(target_id, order_code=order_code)
+            self.state.start_record(
+                target_id,
+                order_code=order_code
+            )
+
             any_started = True
 
         if any_started:
